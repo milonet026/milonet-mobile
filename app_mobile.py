@@ -1,0 +1,139 @@
+import streamlit as st
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# Postavke stranice za mobilni ekran
+st.set_page_config(
+    page_title="MiloNet Servis Mobile",
+    page_icon="🔧",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+def get_db_connection():
+    # Ako aplikacija radi u oblaku, povlači konekciju iz Secrets, a ako radi lokalno koristi fallback URL
+    db_url = st.secrets.get("SUPABASE_URL", "postgresql://postgres.ttwghfszzakdvjuxptcz:Moja27Pobeda%2B@aws-1-eu-west-1.pooler.supabase.com:6543/postgres")
+    return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
+
+def init_supabase_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS servisi (
+            id SERIAL PRIMARY KEY,
+            broj_reversa TEXT UNIQUE,
+            datum_prijema TEXT,
+            marka_model TEXT,
+            vlasnik TEXT,
+            telefon TEXT,
+            opis_kvara TEXT,
+            win_password TEXT DEFAULT '',
+            oprema TEXT DEFAULT '',
+            bitni_podaci TEXT DEFAULT '',
+            napomena TEXT DEFAULT '',
+            status TEXT DEFAULT 'Na servisu',
+            opis_radova TEXT DEFAULT '',
+            cena TEXT DEFAULT ''
+        );
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def fetch_servisi(search_query=""):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if search_query:
+        query = """
+            SELECT * FROM servisi 
+            WHERE broj_reversa ILIKE %s 
+               OR vlasnik ILIKE %s 
+               OR telefon ILIKE %s 
+               OR marka_model ILIKE %s
+            ORDER BY id DESC
+        """
+        wildcard = f"%{search_query}%"
+        cursor.execute(query, (wildcard, wildcard, wildcard, wildcard))
+    else:
+        cursor.execute("SELECT * FROM servisi ORDER BY id DESC")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return rows
+
+def update_servis_in_db(servis_id, status, radovi, cena):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE servisi 
+        SET status = %s, opis_radova = %s, cena = %s 
+        WHERE id = %s
+    """, (status, radovi, cena, servis_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Inicijalizacija tabele pri pokretanju
+try:
+    init_supabase_db()
+except Exception as e:
+    st.error(f"Greška pri povezivanju sa bazom: {e}")
+
+# --- STYLING (Mobilna optimizacija) ---
+st.markdown("""
+    <style>
+    .stApp { padding: 10px; }
+    .card {
+        background-color: #1e222a;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        border-left: 5px solid #2980b9;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Naslov
+st.title("🔧 MiloNet Mobile")
+st.caption("Cloud baza radnih naloga i klijenata")
+
+# Pretraga
+search_input = st.text_input("🔍 Pretraga (Revers, Vlasnik, Telefon, Model):", placeholder="Ukucaj ime, telefon ili revers...")
+
+servisi = fetch_servisi(search_input)
+
+st.write(f"Ukupno pronađeno: **{len(servisi)}**")
+
+# Lista naloga
+for s in servisi:
+    status_color = "🔴" if s['status'] == "Na servisu" else "🟢"
+    
+    with st.expander(f"{status_color} **{s['broj_reversa']}** — {s['vlasnik']} ({s['marka_model']})"):
+        st.markdown(f"**📞 Telefon:** {s['telefon']}")
+        st.markdown(f"**📅 Datum prijema:** {s['datum_prijema']}")
+        st.markdown(f"**🔐 Win Pass:** `{s['win_password'] or 'Nema'}`")
+        st.markdown(f"**🔌 Oprema:** {s['oprema'] or 'Samo uređaj'}")
+        st.markdown(f"**⚠️ Opis kvara:** {s['opis_kvara']}")
+        
+        if s['bitni_podaci']:
+            st.warning(f"💾 Bitni podaci: {s['bitni_podaci']}")
+            
+        st.divider()
+        
+        # Forma za ažuriranje servisa sa telefona
+        with st.form(key=f"form_{s['id']}"):
+            st.subheader("Ažuriranje servisa")
+            
+            statuses = ["Na servisu", "Završeno", "Preuzeto", "Otkazano"]
+            curr_idx = statuses.index(s['status']) if s['status'] in statuses else 0
+            
+            new_status = st.selectbox("Status:", statuses, index=curr_idx, key=f"status_{s['id']}")
+            new_radovi = st.text_area("Urađeni radovi / zamenjeni delovi:", value=s['opis_radova'] or "", key=f"radovi_{s['id']}")
+            new_cena = st.text_input("Cena (RSD):", value=s['cena'] or "", key=f"cena_{s['id']}")
+            
+            submit_btn = st.form_submit_button("💾 Sačuvaj izmene")
+            
+            if submit_btn:
+                update_servis_in_db(s['id'], new_status, new_radovi, new_cena)
+                st.success("Uspešno sačuvano u Cloud bazi!")
+                st.rerun()
