@@ -1,8 +1,7 @@
 import streamlit as st
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
-import pytz
+from datetime import datetime, timezone, timedelta
 
 # Postavke stranice za mobilni ekran
 st.set_page_config(
@@ -54,18 +53,16 @@ def fix_id_sequence():
         pass
 
 def get_local_now_str():
-    """Vraća tačno lokalno vreme za Srbiju (Europe/Belgrade)"""
-    try:
-        tz = pytz.timezone("Europe/Belgrade")
-        return datetime.now(tz).strftime("%d.%m.%Y %H:%M")
-    except Exception:
-        return datetime.now().strftime("%d.%m.%Y %H:%M")
+    """Vraća tačno lokalno vreme za Srbiju (UTC+2 za letnje računanje vremena)"""
+    srbija_tz = timezone(timedelta(hours=2))
+    return datetime.now(srbija_tz).strftime("%d.%m.%Y %H:%M")
 
 def generate_broj_reversa():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        year = datetime.now().strftime("%Y")
+        srbija_tz = timezone(timedelta(hours=2))
+        year = datetime.now(srbija_tz).strftime("%Y")
         cursor.execute("SELECT COUNT(*) as count FROM servisi WHERE broj_reversa LIKE %s", (f"%/{year}",))
         row = cursor.fetchone()
         count = (row['count'] if row else 0) + 1
@@ -73,7 +70,8 @@ def generate_broj_reversa():
         conn.close()
         return f"{count:04d}/{year}"
     except Exception:
-        return "0001/" + datetime.now().strftime("%Y")
+        srbija_tz = timezone(timedelta(hours=2))
+        return "0001/" + datetime.now(srbija_tz).strftime("%Y")
 
 def fetch_servisi(search_query=""):
     conn = get_db_connection()
@@ -199,7 +197,6 @@ with tab_pretraga:
                 
                 statuses = ["Na servisu", "Završeno", "Izdato", "Preuzeto", "Otkazano"]
                 
-                # Provera trenutnog indeksa iz liste statusa
                 try:
                     curr_idx = [st_item.lower() for st_item in statuses].index(status_val)
                 except ValueError:
@@ -215,3 +212,4 @@ with tab_pretraga:
                     update_servis_in_db(s['id'], new_status, new_radovi, new_cena)
                     st.success("Uspešno sačuvano u Cloud bazi!")
                     st.rerun()
+                    
