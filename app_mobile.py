@@ -2,6 +2,7 @@ import streamlit as st
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+import pytz
 
 # Postavke stranice za mobilni ekran
 st.set_page_config(
@@ -49,8 +50,16 @@ def fix_id_sequence():
         conn.commit()
         cursor.close()
         conn.close()
-    except Exception as e:
+    except Exception:
         pass
+
+def get_local_now_str():
+    """Vraća tačno lokalno vreme za Srbiju (Europe/Belgrade)"""
+    try:
+        tz = pytz.timezone("Europe/Belgrade")
+        return datetime.now(tz).strftime("%d.%m.%Y %H:%M")
+    except Exception:
+        return datetime.now().strftime("%d.%m.%Y %H:%M")
 
 def generate_broj_reversa():
     try:
@@ -117,7 +126,7 @@ with tab_prijem:
     st.subheader("Prijem uređaja sa telefona")
     
     automatski_revers = generate_broj_reversa()
-    trenutno_vreme = datetime.now().strftime("%d.%m.%Y %H:%M")
+    trenutno_vreme = get_local_now_str()
 
     with st.form("form_novi_prijem", clear_on_submit=True):
         st.info(f"📋 **Broj reversa:** `{automatski_revers}` | 📅 **Datum:** `{trenutno_vreme}`")
@@ -140,7 +149,7 @@ with tab_prijem:
                 st.error("⚠️ Molimo vas popunite obavezna polja (Vlasnik, Telefon, Model, Kvar).")
             else:
                 try:
-                    fix_id_sequence() # Dodatna provera brojača pre samog upisa
+                    fix_id_sequence()
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute('''
@@ -164,7 +173,14 @@ with tab_pretraga:
     st.caption(f"Ukupno pronađeno: **{len(servisi)}**")
 
     for s in servisi:
-        status_color = "🔴" if s['status'] == "Na servisu" else ("🟢" if s['status'] == "Završeno" else "⚪")
+        # Prikaz statusa u boji (Crveno = Na servisu, Zeleno = Završeno/Izdato/Preuzeto)
+        status_val = str(s['status']).strip().lower()
+        if status_val == "na servisu":
+            status_color = "🔴"
+        elif status_val in ["završeno", "zavrseno", "izdato", "preuzeto"]:
+            status_color = "🟢"
+        else:
+            status_color = "⚪"
         
         with st.expander(f"{status_color} **{s['broj_reversa']}** — {s['vlasnik']} ({s['marka_model']})"):
             st.markdown(f"**📞 Telefon:** {s['telefon']}")
@@ -181,8 +197,13 @@ with tab_pretraga:
             with st.form(key=f"form_{s['id']}"):
                 st.subheader("Ažuriranje servisa")
                 
-                statuses = ["Na servisu", "Završeno", "Preuzeto", "Otkazano"]
-                curr_idx = statuses.index(s['status']) if s['status'] in statuses else 0
+                statuses = ["Na servisu", "Završeno", "Izdato", "Preuzeto", "Otkazano"]
+                
+                # Provera trenutnog indeksa iz liste statusa
+                try:
+                    curr_idx = [st_item.lower() for st_item in statuses].index(status_val)
+                except ValueError:
+                    curr_idx = 0
                 
                 new_status = st.selectbox("Status:", statuses, index=curr_idx, key=f"status_{s['id']}")
                 new_radovi = st.text_area("Urađeni radovi / zamenjeni delovi:", value=s['opis_radova'] or "", key=f"radovi_{s['id']}")
