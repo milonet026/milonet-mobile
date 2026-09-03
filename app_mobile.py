@@ -150,16 +150,8 @@ with tab_pretraga:
     st.caption(f"Ukupno pronađeno: **{len(servisi)}**")
 
     for s in servisi:
-        st_val = str(s.get('status', '')).strip().lower()
-        
-        # Poređenje bez obzira na velika/mala slova
-        if st_val == "završeno" or st_val == "zavrreno":
-            status_color = "🔵"
-        elif st_val in ["preuzeto", "otkazano"]:
-            status_color = "⚪"
-        else:
-            # Podrazumevano za sve aktivne servise ("Na servisu", prazno, itd.)
-            status_color = "🟢"
+        # Originalna logika sa tvoje prve slike: 🔴 ako je "Na servisu", inače 🟢
+        status_color = "🔴" if s.get('status') == "Na servisu" else "🟢"
         
         with st.expander(f"{status_color} **{s['broj_reversa']}** — {s['vlasnik']} ({s['marka_model']})"):
             st.markdown(f"**📞 Telefon:** {s['telefon']}")
