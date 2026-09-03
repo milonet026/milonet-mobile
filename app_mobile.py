@@ -150,7 +150,13 @@ with tab_pretraga:
     st.caption(f"Ukupno pronađeno: **{len(servisi)}**")
 
     for s in servisi:
-        status_color = "🔴" if s['status'] == "Na servisu" else ("🟢" if s['status'] == "Završeno" else "⚪")
+        # Podešavanje ikonica po statusu
+        if s['status'] == "Završeno":
+            status_color = "🟢"
+        elif s['status'] == "Na servisu":
+            status_color = "🔴"
+        else:
+            status_color = "⚪"
         
         with st.expander(f"{status_color} **{s['broj_reversa']}** — {s['vlasnik']} ({s['marka_model']})"):
             st.markdown(f"**📞 Telefon:** {s['telefon']}")
