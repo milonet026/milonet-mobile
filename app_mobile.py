@@ -40,6 +40,18 @@ def init_supabase_db():
     cursor.close()
     conn.close()
 
+def fix_id_sequence():
+    """Popravlja PostgreSQL brojač (sequence) ako je ispao iz sinhronizacije"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT setval(pg_get_serial_sequence('servisi', 'id'), COALESCE(MAX(id), 0) + 1, false) FROM servisi;")
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        pass
+
 def generate_broj_reversa():
     try:
         conn = get_db_connection()
@@ -87,9 +99,10 @@ def update_servis_in_db(servis_id, status, radovi, cena):
     cursor.close()
     conn.close()
 
-# Inicijalizacija baze pri pokretanju
+# Inicijalizacija baze i sinhronizacija brojača ID-eva pri pokretanju
 try:
     init_supabase_db()
+    fix_id_sequence()
 except Exception as e:
     st.error(f"Greška pri povezivanju sa bazom: {e}")
 
@@ -127,6 +140,7 @@ with tab_prijem:
                 st.error("⚠️ Molimo vas popunite obavezna polja (Vlasnik, Telefon, Model, Kvar).")
             else:
                 try:
+                    fix_id_sequence() # Dodatna provera brojača pre samog upisa
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute('''
@@ -150,8 +164,7 @@ with tab_pretraga:
     st.caption(f"Ukupno pronađeno: **{len(servisi)}**")
 
     for s in servisi:
-        # Originalna logika sa tvoje prve slike: 🔴 ako je "Na servisu", inače 🟢
-        status_color = "🔴" if s.get('status') == "Na servisu" else "🟢"
+        status_color = "🔴" if s['status'] == "Na servisu" else ("🟢" if s['status'] == "Završeno" else "⚪")
         
         with st.expander(f"{status_color} **{s['broj_reversa']}** — {s['vlasnik']} ({s['marka_model']})"):
             st.markdown(f"**📞 Telefon:** {s['telefon']}")
