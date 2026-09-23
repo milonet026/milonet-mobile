@@ -35,7 +35,7 @@ st.divider()
 search_query = st.text_input("🔍 Pretraga", placeholder="Unesi ime, telefon ili revers...")
 
 if app_mode == "Servisi":
-    st.subheader("📋 Pregled servisa")
+    st.subheader("📋 Pregled i izmena servisa")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -57,18 +57,62 @@ if app_mode == "Servisi":
         st.text(f"Ukupno pronađeno servisa: {len(rows)}")
 
         for r in rows:
-            status_emoji = "🟢" if r.get('status') == 'Završeno' else "🟡" if r.get('status') == 'Na servisu' else "⚪"
+            status = r.get('status', '')
+            # Definisane boje prema zahtevu: Crvena za Na servisu, Zelena za Završeno, Bela za Otkazano/ostalo
+            if status in ['Na servisu', 'U servisu']:
+                status_emoji = "🔴"
+            elif status in ['Završeno', 'Zavrseno', 'Preuzeto']:
+                status_emoji = "🟢"
+            else:
+                status_emoji = "⚪"
+                
             title_text = f"{status_emoji} {r.get('broj_reversa')} — {r.get('vlasnik')} ({r.get('marka_model')})"
             
             with st.expander(title_text):
                 st.write(f"**Datum prijema:** {r.get('datum_prijema')}")
-                st.write(f"**Telefon:** {r.get('telefon')}")
-                st.write(f"**Status:** {r.get('status')}")
-                st.write(f"**Opis kvara:** {r.get('opis_kvara')}")
-                st.write(f"**Windows šifra:** {r.get('win_password') or 'Nema'}")
-                st.write(f"**Oprema:** {r.get('oprema') or 'Samo uređaj'}")
-                st.write(f"**Urađeni radovi:** {r.get('opis_radova') or 'Nema unosa'}")
-                st.write(f"**Cena:** {r.get('cena') or '0'} RSD")
+                st.write(f"**Trenutni status:** {status}")
+                
+                # Forma za izmenu unutar expandera
+                with st.form(key=f"edit_form_{r.get('id')}"):
+                    st.markdown("### ✏️ Izmena servisa")
+                    
+                    new_vlasnik = st.text_input("Vlasnik", value=r.get('vlasnik') or "")
+                    new_telefon = st.text_input("Telefon", value=r.get('telefon') or "")
+                    new_model = st.text_input("Marka i model", value=r.get('marka_model') or "")
+                    new_win_pass = st.text_input("Windows šifra", value=r.get('win_password') or "")
+                    new_oprema = st.text_input("Oprema", value=r.get('oprema') or "")
+                    
+                    status_options = ["Na servisu", "Završeno", "Preuzeto", "Otkazano"]
+                    curr_status_idx = status_options.index(status) if status in status_options else 0
+                    new_status = st.selectbox("Status", status_options, index=curr_status_idx)
+                    
+                    new_kvar = st.text_area("Opis kvara", value=r.get('opis_kvara') or "")
+                    new_radovi = st.text_area("Urađeni radovi", value=r.get('opis_radova') or "")
+                    new_cena = st.text_input("Cena (RSD)", value=r.get('cena') or "")
+                    new_napomena = st.text_area("Napomena", value=r.get('napomena') or "")
+
+                    submit_btn = st.form_submit_button("💾 Sačuvaj izmene")
+
+                    if submit_btn:
+                        try:
+                            up_conn = get_db_connection()
+                            up_cursor = up_conn.cursor()
+                            up_cursor.execute("""
+                                UPDATE servisi 
+                                SET vlasnik=%s, telefon=%s, marka_model=%s, win_password=%s, 
+                                    oprema=%s, status=%s, opis_kvara=%s, opis_radova=%s, cena=%s, napomena=%s
+                                WHERE id=%s
+                            """, (
+                                new_vlasnik, new_telefon, new_model, new_win_pass, 
+                                new_oprema, new_status, new_kvar, new_radovi, new_cena, new_napomena, r.get('id')
+                            ))
+                            up_conn.commit()
+                            up_cursor.close()
+                            up_conn.close()
+                            st.success("Uspešno sačuvano! Osvežite stranicu za prikaz promena.")
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"Greška prilikom čuvanja: {ex}")
 
     except Exception as e:
         st.error(f"Greška pri učitavanju baze servisa: {e}")
