@@ -313,7 +313,7 @@ with tab_pretraga:
         st.caption(f"Ukupno pronađeno prodaja: **{len(prodaje)}**")
 
         for p in prodaje:
-            with st.expander(f"🛒 **{p['broj_racuna']}** — {p['ukupna_cena']} RSD ({p['kupac'] or 'Nepoznat kupac'})"):
+            with st.expander(f"🛒 **{p['broj_racuna']}** — {p['ukupna_cena']} RSD ({p['vlasnik'] or 'Nepoznat vlasnik'})"):
                 st.markdown(f"**📅 Datum prodaje:** {p['datum_prodaje']}")
                 st.markdown(f"**📦 Stavke:** {p['stavke']}")
                 st.markdown(f"**👤 Kupac:** {p['kupac'] or 'N/A'} ({p['telefon'] or 'N/A'})")
