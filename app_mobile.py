@@ -43,7 +43,7 @@ st.markdown("""
 
 st.title("🔧 MiloNet Electronics — Mobile")
 
-# Navigacija preko radio dugmića (dodat režim za Novi Unos)
+# Navigacija preko radio dugmića
 app_mode = st.radio("Režim rada:", ["➕ Novi Unos", "📋 Servisi", "🛒 Prodaja"], horizontal=True)
 st.divider()
 
@@ -111,9 +111,9 @@ if app_mode == "➕ Novi Unos":
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute('''
-                            INSERT INTO prodaja (broj_reversa, datum_prodaje, vlasnik, telefon, artikal, kolicina, cena, napomena)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ''', (broj_racuna, datum_prodaje, kupac, telefon_kupca, artikal, kolicina, cena, napomena_prodaja))
+                            INSERT INTO prodaja (broj_reversa, datum_prodaje, vlasnik, telefon, artikal, kolicina, cena, status, napomena)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (broj_racuna, datum_prodaje, kupac, telefon_kupca, artikal, kolicina, cena, "Završeno", napomena_prodaja))
                         conn.commit()
                         cursor.close()
                         conn.close()
@@ -148,7 +148,7 @@ else:
             st.text(f"Ukupno pronađeno servisa: {len(rows)}")
 
             for r in rows:
-                status = r.get('status', '')
+                status = r.get('status', '') or ''
                 if status in ['Na servisu', 'U servisu']:
                     status_emoji = "🔴"
                 elif status in ['Završeno', 'Zavrseno', 'Preuzeto']:
@@ -198,7 +198,7 @@ else:
                                 up_conn.commit()
                                 up_cursor.close()
                                 up_conn.close()
-                                st.success("Uspešno sačuvano! Osvežite stranicu.")
+                                st.success("Uspešno sačuvano!")
                                 st.rerun()
                             except Exception as ex:
                                 st.error(f"Greška prilikom čuvanja: {ex}")
@@ -220,7 +220,7 @@ else:
                     ORDER BY id DESC
                 """, (q, q, q, q))
             else:
-                cursor.execute("SELECT * FROM prodaja ORDER BY id DESC LIMIT 50")
+                cursor.execute("SELECT * FROM prodaja ORDER BY id DESC")
                 
             rows = cursor.fetchall()
             cursor.close()
@@ -229,7 +229,7 @@ else:
             st.text(f"Ukupno pronađeno prodaja: {len(rows)}")
 
             for r in rows:
-                status = r.get('status', 'Završeno')
+                status = r.get('status') or 'Završeno'
                 if status in ['Otkazano', 'Stornirano']:
                     status_emoji = "🔴"
                 elif status in ['Završeno', 'Zavrseno', 'Plaćeno']:
@@ -241,7 +241,7 @@ else:
                 
                 with st.expander(title_text):
                     st.write(f"**Datum prodaje:** {r.get('datum_prodaje')}")
-                    st.write(f"**Trenutni status:** {status if 'status' in r and r.get('status') else 'Završeno'}")
+                    st.write(f"**Trenutni status:** {status}")
                     
                     with st.form(key=f"edit_form_prodaja_{r.get('id')}"):
                         st.markdown("### ✏️ Izmena prodaje")
@@ -253,8 +253,8 @@ else:
                         p_cena = st.text_input("Ukupna cena (RSD)", value=r.get('cena') or "")
                         
                         prod_status_options = ["Završeno", "Otkazano", "Rezervisano"]
-                        current_p_status = r.get('status') if 'status' in r and r.get('status') in prod_status_options else "Završeno"
-                        p_status = st.selectbox("Status prodaje", prod_status_options, index=prod_status_options.index(current_p_status))
+                        curr_p_idx = prod_status_options.index(status) if status in prod_status_options else 0
+                        p_status = st.selectbox("Status prodaje", prod_status_options, index=curr_p_idx)
                         
                         p_napomena = st.text_area("Napomena / Garancija", value=r.get('napomena') or "")
 
@@ -266,15 +266,15 @@ else:
                                 up_cursor = up_conn.cursor()
                                 up_cursor.execute("""
                                     UPDATE prodaja 
-                                    SET vlasnik=%s, telefon=%s, artikal=%s, kolicina=%s, cena=%s, napomena=%s
+                                    SET vlasnik=%s, telefon=%s, artikal=%s, kolicina=%s, cena=%s, status=%s, napomena=%s
                                     WHERE id=%s
                                 """, (
-                                    p_vlasnik, p_telefon, p_artikal, p_kolicina, p_cena, p_napomena, r.get('id')
+                                    p_vlasnik, p_telefon, p_artikal, p_kolicina, p_cena, p_status, p_napomena, r.get('id')
                                 ))
                                 up_conn.commit()
                                 up_cursor.close()
                                 up_conn.close()
-                                st.success("Uspešno sačuvano! Osvežite stranicu.")
+                                st.success("Uspešno sačuvano!")
                                 st.rerun()
                             except Exception as ex:
                                 st.error(f"Greška prilikom čuvanja prodaje: {ex}")
