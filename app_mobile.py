@@ -217,10 +217,13 @@ else:
                 cursor.execute("""
                     SELECT * FROM prodaja 
                     WHERE broj_reversa ILIKE %s OR vlasnik ILIKE %s OR telefon ILIKE %s OR artikal ILIKE %s
-                    ORDER BY id DESC
+                    ORDER BY TO_TIMESTAMP(datum_prodaje, 'DD.MM.YYYY HH24:MI') DESC, id DESC
                 """, (q, q, q, q))
             else:
-                cursor.execute("SELECT * FROM prodaja ORDER BY id DESC")
+                cursor.execute("""
+                    SELECT * FROM prodaja 
+                    ORDER BY TO_TIMESTAMP(datum_prodaje, 'DD.MM.YYYY HH24:MI') DESC, id DESC
+                """)
                 
             rows = cursor.fetchall()
             cursor.close()
