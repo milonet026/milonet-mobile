@@ -111,9 +111,9 @@ if app_mode == "➕ Novi Unos":
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute('''
-                            INSERT INTO prodaja (broj_reversa, datum_prodaje, vlasnik, telefon, artikal, kolicina, cena, status, napomena)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ''', (broj_racuna, datum_prodaje, kupac, telefon_kupca, artikal, kolicina, cena, "Završeno", napomena_prodaja))
+                            INSERT INTO prodaja (broj_reversa, datum_prodaje, vlasnik, telefon, artikal, kolicina, cena, napomena)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (broj_racuna, datum_prodaje, kupac, telefon_kupca, artikal, kolicina, cena, napomena_prodaja))
                         conn.commit()
                         cursor.close()
                         conn.close()
@@ -232,19 +232,10 @@ else:
             st.text(f"Ukupno pronađeno prodaja: {len(rows)}")
 
             for r in rows:
-                status = r.get('status') or 'Završeno'
-                if status in ['Otkazano', 'Stornirano']:
-                    status_emoji = "🔴"
-                elif status in ['Završeno', 'Zavrseno', 'Plaćeno']:
-                    status_emoji = "🟢"
-                else:
-                    status_emoji = "⚪"
-
-                title_text = f"{status_emoji} {r.get('broj_reversa')} — {r.get('vlasnik')} ({r.get('artikal')})"
+                title_text = f"🟢 {r.get('broj_reversa')} — {r.get('vlasnik')} ({r.get('artikal')})"
                 
                 with st.expander(title_text):
                     st.write(f"**Datum prodaje:** {r.get('datum_prodaje')}")
-                    st.write(f"**Trenutni status:** {status}")
                     
                     with st.form(key=f"edit_form_prodaja_{r.get('id')}"):
                         st.markdown("### ✏️ Izmena prodaje")
@@ -254,11 +245,6 @@ else:
                         p_artikal = st.text_input("Artikal / Oprema", value=r.get('artikal') or "")
                         p_kolicina = st.text_input("Količina", value=r.get('kolicina') or "1")
                         p_cena = st.text_input("Ukupna cena (RSD)", value=r.get('cena') or "")
-                        
-                        prod_status_options = ["Završeno", "Otkazano", "Rezervisano"]
-                        curr_p_idx = prod_status_options.index(status) if status in prod_status_options else 0
-                        p_status = st.selectbox("Status prodaje", prod_status_options, index=curr_p_idx)
-                        
                         p_napomena = st.text_area("Napomena / Garancija", value=r.get('napomena') or "")
 
                         submit_p_btn = st.form_submit_button("💾 Sačuvaj izmene prodaje")
@@ -269,10 +255,10 @@ else:
                                 up_cursor = up_conn.cursor()
                                 up_cursor.execute("""
                                     UPDATE prodaja 
-                                    SET vlasnik=%s, telefon=%s, artikal=%s, kolicina=%s, cena=%s, status=%s, napomena=%s
+                                    SET vlasnik=%s, telefon=%s, artikal=%s, kolicina=%s, cena=%s, napomena=%s
                                     WHERE id=%s
                                 """, (
-                                    p_vlasnik, p_telefon, p_artikal, p_kolicina, p_cena, p_status, p_napomena, r.get('id')
+                                    p_vlasnik, p_telefon, p_artikal, p_kolicina, p_cena, p_napomena, r.get('id')
                                 ))
                                 up_conn.commit()
                                 up_cursor.close()
