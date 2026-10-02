@@ -151,7 +151,9 @@ else:
                 status = r.get('status', '') or ''
                 if status in ['Na servisu', 'U servisu']:
                     status_emoji = "🔴"
-                elif status in ['Završeno', 'Zavrseno', 'Preuzeto']:
+                elif status in ['Završeno', 'Zavrseno']:
+                    status_emoji = "🟠"
+                elif status == 'Preuzeto':
                     status_emoji = "🟢"
                 else:
                     status_emoji = "⚪"
